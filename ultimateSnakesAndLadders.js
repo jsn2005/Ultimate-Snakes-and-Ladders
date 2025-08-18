@@ -1,7 +1,7 @@
 // =======================
 // BOARD SETUP
 // =======================
-
+// test 12345
 // Generate the board cells
 const board = document.getElementById("board");
 for (let row = 9; row >= 0; row--) {
