@@ -74,6 +74,79 @@ h1 {
 }
 
 /* ==============================
+   GAME HISTORY
+   ============================== */
+
+/* History Button styling */
+#show-history-btn {
+  position: absolute;
+  left: -180px;
+  /* Position to the left of the board */
+  top: 10px;
+  width: 150px;
+  padding: 10px 0;
+  font-size: 1.1rem;
+  background: #f9f9f9;
+  border: 3px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-family: 'Segoe UI', sans-serif;
+  z-index: 10;
+}
+
+#show-history-btn:hover {
+  background: #e0e0e0;
+}
+
+/* History Panel styling */
+#game-history-list {
+  position: absolute;
+  left: -180px;
+  /* Same as button */
+  top: 60px;
+  /* Just below the button */
+  width: 150px;
+  max-height: 350px;
+  overflow-y: auto;
+  background: #fff;
+  border: 3px solid #333;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 10px 6px;
+  font-size: 0.93rem;
+  text-align: left;
+  z-index: 10;
+  display: none;
+  /* Hidden by default */
+}
+
+/* Individual history entry */
+.game-history-entry {
+  border-bottom: 1px solid #eee;
+  padding: 5px 0;
+  font-size: 0.93rem;
+  color: #333;
+}
+
+.game-history-entry:last-child {
+  border-bottom: none;
+}
+
+/* Highlight for special events */
+.game-history-entry .event {
+  font-weight: bold;
+  color: #e74c3c;
+  /* Red for events (customize as needed) */
+}
+
+.game-history-entry .powerup {
+  color: #9b59b6;
+  font-weight: bold;
+}
+
+/* ==============================
    PLAYER COUNTERS
    ============================== */
 
@@ -122,10 +195,6 @@ h1 {
   font-size: 16px;
   cursor: pointer;
 }
-
-/* ==============================
-   INVENTORY AND POWERUPS
-   ============================== */
 
 /* ==============================
    INVENTORY AND POWERUPS
