@@ -36,7 +36,7 @@ const powerupDefinitions = {
             duration: "turn", // lasts one turn
             effect: (player, opponent, gameManager) => {
                 opponent.effects.push({ type: "diceCurse", duration: "turn" });
-                gameManager.displayStatus(`${capitalize(player.color)} used Dice Curse! ${opponent.color}'s next roll will be 1.`);
+                gameManager.displayStatus(`${capitalize(player.color)} used Dice Curse! ${capitalize(opponent.color)}'s next roll will be 1.`);
             }
         },
         {
@@ -64,15 +64,178 @@ const powerupDefinitions = {
     ],
     movement: [
         {
-            name: "Sprint",
+            name: "Dash",
             description: "Move forward 3 extra spaces.",
             duration: "instant",
             effect: (player, opponent, gameManager) => {
                 gameManager.movePlayerAnimated(player, 3);
-                gameManager.displayStatus(`${player.color} used Sprint! Moves forward 3 spaces.`);
+                gameManager.displayStatus(`${capitalize(player.color)} used Dash! Moves forward 3 spaces.`);
             }
-        }
-        // ... more movement powerups
+        },
+        {
+            name: "Jetpack",
+            description: "Move vertically up 2 rows.",
+            duration: "instant",
+            effect: (player, opponent, gameManager) => {
+                const oldPosition = player.position;
+                const newPosition = moveRowsUp(player.position, 2);
+
+                // Remove old counter
+                document.querySelectorAll(`.counter.${player.color}`).forEach(counter => counter.remove());
+                player.position = newPosition;
+                // Add counter to new cell
+                const newCell = document.getElementById("cell-" + player.position);
+                const newCounter = document.createElement("div");
+                newCounter.className = "counter " + player.color;
+                newCell.appendChild(newCounter);
+
+                gameManager.displayStatus(`${capitalize(player.color)} used Jetpack! Moved from ${oldPosition} to ${newPosition} (up 2 rows).`);
+                gameManager.logTurn({
+                    player,
+                    action: "usePowerup",
+                    dice: null,
+                    from: oldPosition,
+                    to: newPosition,
+                    events: ["powerup"],
+                    powerupUsed: "Jetpack",
+                    effectsApplied: player.effects.map(e => e.type)
+                });
+            }
+        },
+        {
+            name: "Double Dice",
+            description: "Your next dice roll is doubled.",
+            duration: "turn",
+            effect: (player, opponent, gameManager) => {
+                player.effects.push({ type: "doubleDice", duration: "turn" });
+                gameManager.displayStatus(`${capitalize(player.color)} used Double Dice! Next roll will be doubled.`);
+            }
+        },
+        {
+            name: "Even Roll",
+            description: "Your next dice roll will be an even number (2, 4, or 6).",
+            duration: "turn",
+            effect: (player, opponent, gameManager) => {
+                player.effects.push({ type: "evenRoll", duration: "turn" });
+                gameManager.displayStatus(`${capitalize(player.color)} used Even Roll! Next roll will be even.`);
+            }
+        },
+        {
+            name: "Reverse Roll",
+            description: "On your next roll, you move backwards instead of forwards.",
+            duration: "turn",
+            effect: (player, opponent, gameManager) => {
+                player.effects.push({ type: "reverseRoll", duration: "turn" });
+                gameManager.displayStatus(`${capitalize(player.color)} used Reverse Roll! Next roll will move backwards.`);
+            }
+        },
+        {
+            name: "L.A.D.D.E.R Intelligence",
+            description: "Move to the base of the nearest ladder ahead of you.",
+            duration: "instant",
+            effect: (player, opponent, gameManager) => {
+                const ladders = Object.keys(gameManager.ladders).map(Number).sort((a, b) => a - b);
+                // Find the next ladder start greater than current position
+                const nextLadderBase = ladders.find(cell => cell > player.position);
+                const oldPosition = player.position;
+                if (nextLadderBase) {
+                    // Remove old counter
+                    document.querySelectorAll(`.counter.${player.color}`).forEach(counter => counter.remove());
+                    player.position = nextLadderBase;
+                    // Add counter to new cell
+                    const newCell = document.getElementById("cell-" + player.position);
+                    const newCounter = document.createElement("div");
+                    newCounter.className = "counter " + player.color;
+                    newCell.appendChild(newCounter);
+
+                    gameManager.displayStatus(`${capitalize(player.color)} used L.A.D.D.E.R Intelligence! Moved from ${oldPosition} to ladder base at ${nextLadderBase}.`);
+                    gameManager.logTurn({
+                        player,
+                        action: "usePowerup",
+                        dice: null,
+                        from: oldPosition,
+                        to: nextLadderBase,
+                        events: ["powerup"],
+                        powerupUsed: "L.A.D.D.E.R Intelligence",
+                        effectsApplied: player.effects.map(e => e.type)
+                    });
+                } else {
+                    gameManager.displayStatus(`${capitalize(player.color)} used L.A.D.D.E.R Intelligence but there are no ladders ahead!`);
+                    gameManager.logTurn({
+                        player,
+                        action: "usePowerup",
+                        dice: null,
+                        from: oldPosition,
+                        to: oldPosition,
+                        events: ["powerup"],
+                        powerupUsed: "L.A.D.D.E.R Intelligence",
+                        effectsApplied: player.effects.map(e => e.type)
+                    });
+                }
+            }
+        },
+        {
+            name: "Hermes Boots",
+            description: "For the next 2 rolls, add +2 to each dice roll.",
+            duration: 2, // Use number to represent turns left
+            effect: (player, opponent, gameManager) => {
+                player.effects.push({ type: "hermesBoots", duration: 2 });
+                gameManager.displayStatus(`${capitalize(player.color)} used Hermes Boots! Next 2 rolls will get +2.`);
+            }
+        },
+        {
+            name: "Broken Teleporter",
+            description: "Teleports you to a random square behind the opponent.",
+            duration: "instant",
+            effect: (player, opponent, gameManager) => {
+                const oldPosition = player.position;
+                // Get all squares behind the opponent (less than opponent.position)
+                const possibleSquares = [];
+                for (let i = 1; i < opponent.position; i++) {
+                    possibleSquares.push(i);
+                }
+
+                if (possibleSquares.length === 0) {
+                    // If there are no squares behind the opponent
+                    gameManager.displayStatus(`${capitalize(player.color)} used Broken Teleporter, but there are no squares behind ${capitalize(opponent.color)}!`);
+                    gameManager.logTurn({
+                        player,
+                        action: "usePowerup",
+                        dice: null,
+                        from: oldPosition,
+                        to: oldPosition,
+                        events: ["powerup"],
+                        powerupUsed: "Broken Teleporter",
+                        effectsApplied: player.effects.map(e => e.type)
+                    });
+                    return;
+                }
+
+                // Pick a random square
+                const targetSquare = possibleSquares[Math.floor(Math.random() * possibleSquares.length)];
+
+                // Remove old counter
+                document.querySelectorAll(`.counter.${player.color}`).forEach(counter => counter.remove());
+                player.position = targetSquare;
+                // Add counter to new cell
+                const newCell = document.getElementById("cell-" + player.position);
+                const newCounter = document.createElement("div");
+                newCounter.className = "counter " + player.color;
+                newCell.appendChild(newCounter);
+
+                gameManager.displayStatus(`${capitalize(player.color)} used Broken Teleporter! Moved from ${oldPosition} to ${targetSquare}, behind ${capitalize(opponent.color)}.`);
+                gameManager.logTurn({
+                    player,
+                    action: "usePowerup",
+                    dice: null,
+                    from: oldPosition,
+                    to: targetSquare,
+                    events: ["powerup"],
+                    powerupUsed: "Broken Teleporter",
+                    effectsApplied: player.effects.map(e => e.type)
+                });
+            }
+        },
     ],
     chaos: [
         {
@@ -135,6 +298,22 @@ function moveOneRowDown(position, cols = 10) {
     return newRow * cols + newCol + 1;
 }
 
+function moveRowsUp(position, rows = 2, cols = 10) {
+    // Move player vertically up by N rows, preserving column logic for zigzag
+    const index = position - 1;
+    const row = Math.floor(index / cols);
+    const col = index % cols;
+
+    let newRow = Math.min(row + rows, 9);
+    let newCol;
+    if (row % 2 === 0) {
+        newCol = newRow % 2 === 0 ? col : cols - 1 - col;
+    } else {
+        newCol = newRow % 2 === 0 ? cols - 1 - col : col;
+    }
+    return newRow * cols + newCol + 1;
+}
+
 
 // ===================== Player Class =====================
 
@@ -171,6 +350,7 @@ class GameManager {
         this.powerupTypes = POWERUP_TYPES;
         this.powerupIcons = POWERUP_ICONS;
         this.gameHistory = [];
+        this.isGameOver = false;
 
         this.setupGame();
     }
@@ -274,12 +454,17 @@ class GameManager {
         document.getElementById("rollBtn").addEventListener("click", () => {
             let player = this.players[this.currentPlayerIdx];
             let dice = player.rollDice();
-            dice = this.processPlayerEffects(player, dice); // <-- resolve effects here
+            const result = this.processPlayerEffects(player, dice);
 
-            document.getElementById("status").innerText =
-                `${capitalize(player.color)} rolled a ${dice}.`;
+            // Show all messages
+            let statusMsg = "";
+            if (result.messages.length) {
+                statusMsg += result.messages.join("\n") + "\n";
+            }
+            statusMsg += `${capitalize(player.color)} rolled a ${result.value}.`;
+            document.getElementById("status").innerText = statusMsg;
 
-            this.movePlayerAnimated(player, dice);
+            this.movePlayerAnimated(player, result.value);
         });
     }
 
@@ -297,10 +482,10 @@ class GameManager {
         this.lastPlayerPositionBefore = player.position;
         this.lastDiceValue = steps;
         this.lastEvents = [];
-        this.stepAnimation(player, 0, steps);
+        this.stepAnimation(player, 0, Math.abs(steps), steps < 0 ? -1 : 1);
     }
 
-    stepAnimation(player, count, total) {
+    stepAnimation(player, count, total, direction = 1) {
         if (count < total) {
             let oldCell = document.getElementById("cell-" + player.position);
             if (oldCell) {
@@ -308,14 +493,14 @@ class GameManager {
                 if (oldCounter) oldCounter.remove();
             }
 
-            player.position = Math.min(player.position + 1, 100);
+            player.position = Math.max(1, Math.min(player.position + direction, 100));
 
             let newCell = document.getElementById("cell-" + player.position);
             let counter = document.createElement("div");
             counter.className = "counter " + player.color;
             newCell.appendChild(counter);
 
-            setTimeout(() => this.stepAnimation(player, count + 1, total), 300);
+            setTimeout(() => this.stepAnimation(player, count + 1, total, direction), 300);
         } else {
             this.resolveBoardEvents(player);
         }
@@ -368,6 +553,9 @@ class GameManager {
         } else if (player.position === 100) {
             document.getElementById("status").innerText =
                 `${capitalize(player.color)} wins the game!`;
+            this.isGameOver = true; // <-- set game over!
+            document.getElementById("rollBtn").disabled = true; // Disable rolling
+            this.updateInventoryInteractivity(); // Optionally disables inventory usage
             // Log Win Event
             this.logTurn({
                 player,
@@ -379,6 +567,7 @@ class GameManager {
                 powerupUsed: this.lastPowerupUsed || null,
                 effectsApplied: player.effects.map(e => e.type)
             });
+            return; // Exit so no further code runs
         } else {
             // Log a normal move (no event)
             this.logTurn({
@@ -396,6 +585,11 @@ class GameManager {
     }
 
     switchTurn() {
+        if (this.isGameOver) {
+            document.getElementById("rollBtn").disabled = true;
+            this.updateInventoryInteractivity();
+            return;
+        }
         this.currentPlayerIdx = (this.currentPlayerIdx + 1) % this.players.length;
         const nextColor = capitalize(this.players[this.currentPlayerIdx].color);
         document.getElementById("status").innerText += ` | ${nextColor}'s turn`;
@@ -420,32 +614,53 @@ class GameManager {
     processPlayerEffects(player, diceValue) {
         let newDiceValue = diceValue;
         let effectsToRemove = [];
+        let messages = [];
 
         for (const effect of player.effects) {
             if (effect.type === "diceCurse") {
                 newDiceValue = 1;
                 effectsToRemove.push(effect);
-                this.displayStatus(`${capitalize(player.color)} is cursed. The next dice roll will be 1.`);
+                messages.push(`${capitalize(player.color)} is cursed. The next dice roll will be 1.`);
             }
             if (effect.type === "markOfMisfortune") {
                 if (newDiceValue % 2 === 0) {
-                    // Remove Old Counter
                     document.querySelectorAll(`.counter.${player.color}`).forEach(counter => counter.remove());
-                    // Move Player Down one Row
                     player.position = moveOneRowDown(player.position);
-                    // Add counter to new cell
                     const newCell = document.getElementById("cell-" + player.position);
                     const newCounter = document.createElement("div");
-                    newCounter.className = "counter" + player.color;
+                    newCounter.className = "counter " + player.color;
                     newCell.appendChild(newCounter);
-
-                    this.displayStatus(`${capitalize(player.color)} rolled even and moves down one row!`);
+                    messages.push(`${capitalize(player.color)} rolled even and moves down one row!`);
                 }
                 effectsToRemove.push(effect);
             }
+            if (effect.type === "doubleDice") {
+                newDiceValue *= 2;
+                effectsToRemove.push(effect);
+                messages.push(`${capitalize(player.color)}'s roll is doubled to ${newDiceValue}!`);
+            }
+            if (effect.type === "evenRoll") {
+                const evens = [2, 4, 6];
+                newDiceValue = evens[Math.floor(Math.random() * evens.length)];
+                effectsToRemove.push(effect);
+                messages.push(`${capitalize(player.color)}'s roll is changed to an even number: ${newDiceValue}.`);
+            }
+            if (effect.type === "reverseRoll") {
+                newDiceValue = -Math.abs(newDiceValue);
+                effectsToRemove.push(effect);
+                messages.push(`${capitalize(player.color)}'s roll will move them backwards by ${Math.abs(newDiceValue)} spaces!`);
+            }
+            if (effect.type === "hermesBoots") {
+                newDiceValue += 2;
+                effect.duration -= 1;
+                messages.push(`${capitalize(player.color)}'s Hermes Boots effect: +2 to dice. Rolled ${diceValue} → ${newDiceValue}.`);
+                if (effect.duration <= 0) {
+                    effectsToRemove.push(effect);
+                }
+            }
         }
         player.effects = player.effects.filter(e => !effectsToRemove.includes(e));
-        return newDiceValue;
+        return { value: newDiceValue, messages };
     }
 
     // --- Board Drawing ---
@@ -656,3 +871,4 @@ document.getElementById("show-history-btn").addEventListener("click", function (
 // Example: Give starting powerups
 gameManager.addPowerupToPlayer(gameManager.players[0], "attack", "Mark of Misfortune");
 gameManager.addPowerupToPlayer(gameManager.players[1], "attack", "Dice Curse");
+gameManager.addPowerupToPlayer(gameManager.players[1], "movement", "Broken Teleporter");
