@@ -33,10 +33,11 @@ const powerupDefinitions = {
         {
             name: "Dice Curse",
             description: "Opponent's next roll will be 1.",
-            duration: "turn", // lasts one turn
+            duration: "turn",
             effect: (player, opponent, gameManager) => {
                 opponent.effects.push({ type: "diceCurse", duration: "turn" });
                 gameManager.displayStatus(`${capitalize(player.color)} used Dice Curse! ${capitalize(opponent.color)}'s next roll will be 1.`);
+                gameManager.lastPowerupUsed = "Dice Curse";
             }
         },
         {
@@ -46,9 +47,9 @@ const powerupDefinitions = {
             effect: (player, opponent, gameManager) => {
                 opponent.effects.push({ type: "markOfMisfortune", duration: "turn" });
                 gameManager.displayStatus(`${capitalize(player.color)} used Mark of Misfortune! If the next roll is even, ${opponent.color} moves down one row.`);
+                gameManager.lastPowerupUsed = "Mark of Misfortune";
             }
         }
-        // ... more attack powerups
     ],
     defence: [
         {
@@ -58,9 +59,9 @@ const powerupDefinitions = {
             effect: (player, opponent, gameManager) => {
                 player.effects.push({ type: "shieldWall", duration: "turn" });
                 gameManager.displayStatus(`${player.color} used Shield Wall! Blocks next attack powerup.`);
+                gameManager.lastPowerupUsed = "Shield Wall";
             }
         }
-        // ... more defence powerups
     ],
     movement: [
         {
@@ -68,8 +69,21 @@ const powerupDefinitions = {
             description: "Move forward 3 extra spaces.",
             duration: "instant",
             effect: (player, opponent, gameManager) => {
+                const oldPosition = player.position;
                 gameManager.movePlayerAnimated(player, 3);
                 gameManager.displayStatus(`${capitalize(player.color)} used Dash! Moves forward 3 spaces.`);
+                gameManager.logTurn({
+                    player,
+                    action: "usePowerup",
+                    dice: null,
+                    from: oldPosition,
+                    to: player.position,
+                    events: ["powerup"],
+                    powerupUsed: "Dash",
+                    effectsApplied: player.effects.map(e => e.type)
+                });
+                gameManager.lastPowerupUsed = null;
+                gameManager.switchTurn();
             }
         },
         {
@@ -79,16 +93,12 @@ const powerupDefinitions = {
             effect: (player, opponent, gameManager) => {
                 const oldPosition = player.position;
                 const newPosition = moveRowsUp(player.position, 2);
-
-                // Remove old counter
                 document.querySelectorAll(`.counter.${player.color}`).forEach(counter => counter.remove());
                 player.position = newPosition;
-                // Add counter to new cell
                 const newCell = document.getElementById("cell-" + player.position);
                 const newCounter = document.createElement("div");
                 newCounter.className = "counter " + player.color;
                 newCell.appendChild(newCounter);
-
                 gameManager.displayStatus(`${capitalize(player.color)} used Jetpack! Moved from ${oldPosition} to ${newPosition} (up 2 rows).`);
                 gameManager.logTurn({
                     player,
@@ -100,6 +110,8 @@ const powerupDefinitions = {
                     powerupUsed: "Jetpack",
                     effectsApplied: player.effects.map(e => e.type)
                 });
+                gameManager.lastPowerupUsed = null;
+                gameManager.switchTurn();
             }
         },
         {
@@ -109,6 +121,7 @@ const powerupDefinitions = {
             effect: (player, opponent, gameManager) => {
                 player.effects.push({ type: "doubleDice", duration: "turn" });
                 gameManager.displayStatus(`${capitalize(player.color)} used Double Dice! Next roll will be doubled.`);
+                gameManager.lastPowerupUsed = "Double Dice";
             }
         },
         {
@@ -118,6 +131,7 @@ const powerupDefinitions = {
             effect: (player, opponent, gameManager) => {
                 player.effects.push({ type: "evenRoll", duration: "turn" });
                 gameManager.displayStatus(`${capitalize(player.color)} used Even Roll! Next roll will be even.`);
+                gameManager.lastPowerupUsed = "Even Roll";
             }
         },
         {
@@ -127,6 +141,7 @@ const powerupDefinitions = {
             effect: (player, opponent, gameManager) => {
                 player.effects.push({ type: "reverseRoll", duration: "turn" });
                 gameManager.displayStatus(`${capitalize(player.color)} used Reverse Roll! Next roll will move backwards.`);
+                gameManager.lastPowerupUsed = "Reverse Roll";
             }
         },
         {
@@ -135,19 +150,15 @@ const powerupDefinitions = {
             duration: "instant",
             effect: (player, opponent, gameManager) => {
                 const ladders = Object.keys(gameManager.ladders).map(Number).sort((a, b) => a - b);
-                // Find the next ladder start greater than current position
                 const nextLadderBase = ladders.find(cell => cell > player.position);
                 const oldPosition = player.position;
                 if (nextLadderBase) {
-                    // Remove old counter
                     document.querySelectorAll(`.counter.${player.color}`).forEach(counter => counter.remove());
                     player.position = nextLadderBase;
-                    // Add counter to new cell
                     const newCell = document.getElementById("cell-" + player.position);
                     const newCounter = document.createElement("div");
                     newCounter.className = "counter " + player.color;
                     newCell.appendChild(newCounter);
-
                     gameManager.displayStatus(`${capitalize(player.color)} used L.A.D.D.E.R Intelligence! Moved from ${oldPosition} to ladder base at ${nextLadderBase}.`);
                     gameManager.logTurn({
                         player,
@@ -159,6 +170,8 @@ const powerupDefinitions = {
                         powerupUsed: "L.A.D.D.E.R Intelligence",
                         effectsApplied: player.effects.map(e => e.type)
                     });
+                    gameManager.lastPowerupUsed = null;
+                    gameManager.switchTurn();
                 } else {
                     gameManager.displayStatus(`${capitalize(player.color)} used L.A.D.D.E.R Intelligence but there are no ladders ahead!`);
                     gameManager.logTurn({
@@ -171,16 +184,19 @@ const powerupDefinitions = {
                         powerupUsed: "L.A.D.D.E.R Intelligence",
                         effectsApplied: player.effects.map(e => e.type)
                     });
+                    gameManager.lastPowerupUsed = null;
+                    gameManager.switchTurn();
                 }
             }
         },
         {
             name: "Hermes Boots",
             description: "For the next 2 rolls, add +2 to each dice roll.",
-            duration: 2, // Use number to represent turns left
+            duration: 2,
             effect: (player, opponent, gameManager) => {
                 player.effects.push({ type: "hermesBoots", duration: 2 });
                 gameManager.displayStatus(`${capitalize(player.color)} used Hermes Boots! Next 2 rolls will get +2.`);
+                gameManager.lastPowerupUsed = "Hermes Boots";
             }
         },
         {
@@ -189,14 +205,11 @@ const powerupDefinitions = {
             duration: "instant",
             effect: (player, opponent, gameManager) => {
                 const oldPosition = player.position;
-                // Get all squares behind the opponent (less than opponent.position)
                 const possibleSquares = [];
                 for (let i = 1; i < opponent.position; i++) {
                     possibleSquares.push(i);
                 }
-
                 if (possibleSquares.length === 0) {
-                    // If there are no squares behind the opponent
                     gameManager.displayStatus(`${capitalize(player.color)} used Broken Teleporter, but there are no squares behind ${capitalize(opponent.color)}!`);
                     gameManager.logTurn({
                         player,
@@ -208,21 +221,17 @@ const powerupDefinitions = {
                         powerupUsed: "Broken Teleporter",
                         effectsApplied: player.effects.map(e => e.type)
                     });
+                    gameManager.lastPowerupUsed = null;
+                    gameManager.switchTurn();
                     return;
                 }
-
-                // Pick a random square
                 const targetSquare = possibleSquares[Math.floor(Math.random() * possibleSquares.length)];
-
-                // Remove old counter
                 document.querySelectorAll(`.counter.${player.color}`).forEach(counter => counter.remove());
                 player.position = targetSquare;
-                // Add counter to new cell
                 const newCell = document.getElementById("cell-" + player.position);
                 const newCounter = document.createElement("div");
                 newCounter.className = "counter " + player.color;
                 newCell.appendChild(newCounter);
-
                 gameManager.displayStatus(`${capitalize(player.color)} used Broken Teleporter! Moved from ${oldPosition} to ${targetSquare}, behind ${capitalize(opponent.color)}.`);
                 gameManager.logTurn({
                     player,
@@ -234,8 +243,40 @@ const powerupDefinitions = {
                     powerupUsed: "Broken Teleporter",
                     effectsApplied: player.effects.map(e => e.type)
                 });
+                gameManager.lastPowerupUsed = null;
+                gameManager.switchTurn();
             }
         },
+        {
+            name: "Anchor",
+            description: "Skip your current roll, then your next roll gets +5.",
+            duration: "turn",
+            effect: (player, opponent, gameManager) => {
+                player.effects.push({ type: "anchor", state: "skip", duration: 2 });
+                gameManager.displayStatus(`${capitalize(player.color)} used Anchor! Your next roll will be skipped, then the following roll gets +5.`);
+                gameManager.lastPowerupUsed = "Anchor";
+            }
+        },
+        {
+            name: "Two Half Rolls",
+            description: "On your next turn, roll twice. Each roll's value is halved (rounded up), and you move by their sum.",
+            duration: "turn",
+            effect: (player, opponent, gameManager) => {
+                player.effects.push({ type: "twoHalfRolls", duration: "turn" });
+                gameManager.displayStatus(`${capitalize(player.color)} used Two Half Rolls! Next turn, roll twice and halve each roll.`);
+                gameManager.lastPowerupUsed = "Two Half Rolls";
+            }
+        },
+        {
+            name: "Slow Crawl",
+            description: "Your next dice roll will be a guaranteed value of 3.",
+            duration: "turn",
+            effect: (player, opponent, gameManager) => {
+                player.effects.push({ type: "slowCrawl", duration: "turn" });
+                gameManager.displayStatus(`${capitalize(player.color)} used Slow Crawl! Next roll will be a guaranteed value of 3.`);
+                gameManager.lastPowerupUsed = "Slow Crawl";
+            }
+        }
     ],
     chaos: [
         {
@@ -248,9 +289,20 @@ const powerupDefinitions = {
                 opponent.position = temp;
                 gameManager.updatePlayerPositions();
                 gameManager.displayStatus(`${player.color} used Swap Places!`);
+                gameManager.logTurn({
+                    player,
+                    action: "usePowerup",
+                    dice: null,
+                    from: opponent.position,
+                    to: player.position,
+                    events: ["powerup"],
+                    powerupUsed: "Swap Places",
+                    effectsApplied: player.effects.map(e => e.type)
+                });
+                gameManager.lastPowerupUsed = null;
+                gameManager.switchTurn();
             }
         }
-        // ... more chaos powerups
     ],
     legendary: [
         {
@@ -260,9 +312,19 @@ const powerupDefinitions = {
             effect: (player, opponent, gameManager) => {
                 gameManager.extraTurnFor(player);
                 gameManager.displayStatus(`${player.color} used Time Stop! Gets an extra turn.`);
+                gameManager.logTurn({
+                    player,
+                    action: "usePowerup",
+                    dice: null,
+                    from: player.position,
+                    to: player.position,
+                    events: ["powerup"],
+                    powerupUsed: "Time Stop",
+                    effectsApplied: player.effects.map(e => e.type)
+                });
+                gameManager.lastPowerupUsed = null;
             }
         }
-        // ... more legendary powerups
     ]
 };
 
@@ -276,7 +338,6 @@ function getCellCenter(num) {
     const cell = document.getElementById("cell-" + num);
     const boardRect = document.getElementById("board").getBoundingClientRect();
     const rect = cell.getBoundingClientRect();
-
     return {
         x: rect.left - boardRect.left + rect.width / 2,
         y: rect.top - boardRect.top + rect.height / 2
@@ -299,11 +360,9 @@ function moveOneRowDown(position, cols = 10) {
 }
 
 function moveRowsUp(position, rows = 2, cols = 10) {
-    // Move player vertically up by N rows, preserving column logic for zigzag
     const index = position - 1;
     const row = Math.floor(index / cols);
     const col = index % cols;
-
     let newRow = Math.min(row + rows, 9);
     let newCol;
     if (row % 2 === 0) {
@@ -313,7 +372,6 @@ function moveRowsUp(position, rows = 2, cols = 10) {
     }
     return newRow * cols + newCol + 1;
 }
-
 
 // ===================== Player Class =====================
 
@@ -337,7 +395,6 @@ class Player {
     }
 }
 
-
 // ===================== GameManager Class =====================
 
 class GameManager {
@@ -350,8 +407,8 @@ class GameManager {
         this.powerupTypes = POWERUP_TYPES;
         this.powerupIcons = POWERUP_ICONS;
         this.gameHistory = [];
+        this.lastPowerupUsed = null;
         this.isGameOver = false;
-
         this.setupGame();
     }
 
@@ -359,11 +416,11 @@ class GameManager {
         const turnEntry = {
             turn: this.gameHistory.length + 1,
             player: player.color,
-            action,              // "roll", "usePowerup", etc.
-            dice,                // integer or null
-            from,                // starting position
-            to,                  // ending position
-            events: events || [],// array of strings: "ladder", "snake", "powerup", "win"
+            action,
+            dice,
+            from,
+            to,
+            events: events || [],
             powerupUsed: powerupUsed || null,
             effectsApplied: effectsApplied || [],
             timestamp: new Date().toISOString()
@@ -371,7 +428,6 @@ class GameManager {
         this.gameHistory.push(turnEntry);
     }
 
-    // --- Game Setup ---
     setupGame() {
         this.setupBoard();
         this.setupOverlay();
@@ -387,7 +443,6 @@ class GameManager {
                 rowCells.push(number);
             }
             if (row % 2 === 1) rowCells.reverse();
-
             rowCells.forEach(num => {
                 const cell = document.createElement("div");
                 cell.className = "cell";
@@ -396,7 +451,6 @@ class GameManager {
                 this.board.appendChild(cell);
             });
         }
-
         Object.entries(this.ladders).forEach(([start, end]) => this.drawLadder(Number(start), end));
         Object.entries(this.snakes).forEach(([start, end]) => this.drawSnake(Number(start), end));
         Object.entries(this.powerupLocations).forEach(([type, cells]) => {
@@ -405,7 +459,6 @@ class GameManager {
     }
 
     setupOverlay() {
-        // SVG overlay for ladders/snakes
         if (!document.getElementById("overlay")) {
             const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
             overlay.id = "overlay";
@@ -427,7 +480,6 @@ class GameManager {
         }
     }
 
-    // --- Player Management ---
     addPlayer(player) {
         this.players.push(player);
     }
@@ -449,21 +501,17 @@ class GameManager {
         this.updateInventoryInteractivity();
     }
 
-    // --- Turn and Movement Logic ---
     attachDiceListener() {
         document.getElementById("rollBtn").addEventListener("click", () => {
             let player = this.players[this.currentPlayerIdx];
             let dice = player.rollDice();
             const result = this.processPlayerEffects(player, dice);
-
-            // Show all messages
             let statusMsg = "";
             if (result.messages.length) {
                 statusMsg += result.messages.join("\n") + "\n";
             }
             statusMsg += `${capitalize(player.color)} rolled a ${result.value}.`;
             document.getElementById("status").innerText = statusMsg;
-
             this.movePlayerAnimated(player, result.value);
         });
     }
@@ -492,14 +540,11 @@ class GameManager {
                 let oldCounter = oldCell.querySelector(".counter." + player.color);
                 if (oldCounter) oldCounter.remove();
             }
-
             player.position = Math.max(1, Math.min(player.position + direction, 100));
-
             let newCell = document.getElementById("cell-" + player.position);
             let counter = document.createElement("div");
             counter.className = "counter " + player.color;
             newCell.appendChild(counter);
-
             setTimeout(() => this.stepAnimation(player, count + 1, total, direction), 300);
         } else {
             this.resolveBoardEvents(player);
@@ -512,15 +557,12 @@ class GameManager {
             let oldCounter = oldCell.querySelector(".counter." + player.color);
             if (oldCounter) oldCounter.remove();
         }
-
         const from = player.position;
         player.position = target;
         let newCell = document.getElementById("cell-" + player.position);
-        let counter = document.createElement("div"); // <-- fixed
+        let counter = document.createElement("div");
         counter.className = "counter " + player.color;
         newCell.appendChild(counter);
-
-        // Log the jump event (ladder or snake)
         this.logTurn({
             player,
             action: "roll",
@@ -531,7 +573,7 @@ class GameManager {
             powerupUsed: this.lastPowerupUsed || null,
             effectsApplied: player.effects.map(e => e.type)
         });
-
+        this.lastPowerupUsed = null;
         this.switchTurn();
     }
 
@@ -542,21 +584,20 @@ class GameManager {
             const ladderEnd = this.ladders[player.position];
             document.getElementById("status").innerText =
                 `${capitalize(player.color)} climbed a ladder to ${ladderEnd}!`;
-            this.animateJump(player, ladderEnd, "ladder"); // <-- PASS "ladder" HERE!
+            this.animateJump(player, ladderEnd, "ladder");
             return;
         } else if (this.snakes[player.position]) {
             const snakeEnd = this.snakes[player.position];
             document.getElementById("status").innerText =
                 `Oh no! ${capitalize(player.color)} got bitten by a snake, sliding to ${snakeEnd}`;
-            this.animateJump(player, snakeEnd, "snake"); // <-- PASS "snake" HERE!
+            this.animateJump(player, snakeEnd, "snake");
             return;
         } else if (player.position === 100) {
             document.getElementById("status").innerText =
                 `${capitalize(player.color)} wins the game!`;
-            this.isGameOver = true; // <-- set game over!
-            document.getElementById("rollBtn").disabled = true; // Disable rolling
-            this.updateInventoryInteractivity(); // Optionally disables inventory usage
-            // Log Win Event
+            this.isGameOver = true;
+            document.getElementById("rollBtn").disabled = true;
+            this.updateInventoryInteractivity();
             this.logTurn({
                 player,
                 action: "roll",
@@ -567,9 +608,9 @@ class GameManager {
                 powerupUsed: this.lastPowerupUsed || null,
                 effectsApplied: player.effects.map(e => e.type)
             });
-            return; // Exit so no further code runs
+            this.lastPowerupUsed = null;
+            return;
         } else {
-            // Log a normal move (no event)
             this.logTurn({
                 player,
                 action: "roll",
@@ -580,6 +621,7 @@ class GameManager {
                 powerupUsed: this.lastPowerupUsed || null,
                 effectsApplied: player.effects.map(e => e.type)
             });
+            this.lastPowerupUsed = null;
         }
         this.switchTurn();
     }
@@ -598,12 +640,10 @@ class GameManager {
     }
 
     updateInventoryInteractivity() {
-        // Disable all slots first
         document.querySelectorAll('.powerup-slot').forEach(slot => {
             slot.style.pointerEvents = 'none';
-            slot.style.opacity = '0.5'; // visually dim
+            slot.style.opacity = '0.5';
         });
-        // Enable only current player's slots
         const currentPlayer = this.players[this.currentPlayerIdx];
         document.querySelectorAll(`#player-${currentPlayer.color}-inventory .powerup-slot`).forEach(slot => {
             slot.style.pointerEvents = 'auto';
@@ -615,7 +655,6 @@ class GameManager {
         let newDiceValue = diceValue;
         let effectsToRemove = [];
         let messages = [];
-
         for (const effect of player.effects) {
             if (effect.type === "diceCurse") {
                 newDiceValue = 1;
@@ -658,23 +697,38 @@ class GameManager {
                     effectsToRemove.push(effect);
                 }
             }
+            if (effect.type === "anchor") {
+                if (effect.state === "skip") {
+                    newDiceValue = 0;
+                    effect.state = "bonus";
+                    messages.push(`${capitalize(player.color)}'s Anchor effect: Roll skipped!`);
+                } else if (effect.state === "bonus") {
+                    newDiceValue += 5;
+                    effectsToRemove.push(effect);
+                    messages.push(`${capitalize(player.color)}'s Anchor effect: +5 to roll!`);
+                }
+                effect.duration -= 1;
+            }
+            if (effect.type === "slowCrawl") {
+                newDiceValue = 3;
+                effectsToRemove.push(effect);
+                messages.push(`${capitalize(player.color)}'s Slow Crawl: Dice value set to 3.`);
+            }
+            if (effect.type === "twoHalfRolls") {
+                effectsToRemove.push(effect);
+            }
         }
         player.effects = player.effects.filter(e => !effectsToRemove.includes(e));
         return { value: newDiceValue, messages };
     }
 
-    // --- Board Drawing ---
-
     drawLadder(start, end) {
         const { x: x1, y: y1 } = getCellCenter(start);
         const { x: x2, y: y2 } = getCellCenter(end);
         const overlay = document.getElementById("overlay");
-
         const dx = x2 - x1, dy = y2 - y1, length = Math.sqrt(dx * dx + dy * dy);
         const nx = dx / length, ny = dy / length;
         const px = -ny, py = nx, halfWidth = 10;
-
-        // Rails
         for (const sign of [+1, -1]) {
             const rail = document.createElementNS("http://www.w3.org/2000/svg", "line");
             rail.setAttribute("x1", x1 + px * halfWidth * sign);
@@ -685,8 +739,6 @@ class GameManager {
             rail.setAttribute("stroke-width", "4");
             overlay.appendChild(rail);
         }
-
-        // Rungs
         const rungCount = Math.floor(length / 30);
         for (let i = 1; i < rungCount; i++) {
             const t = i / rungCount;
@@ -706,10 +758,8 @@ class GameManager {
         const { x: x1, y: y1 } = getCellCenter(start);
         const { x: x2, y: y2 } = getCellCenter(end);
         const overlay = document.getElementById("overlay");
-
         const midX = (x1 + x2) / 2;
         const midY = (y1 + y2) / 2 - 30;
-
         const pathData = `M ${x1} ${y1} Q ${midX} ${midY}, ${x2} ${y2}`;
         const snakeBody = document.createElementNS("http://www.w3.org/2000/svg", "path");
         snakeBody.setAttribute("d", pathData);
@@ -718,8 +768,6 @@ class GameManager {
         snakeBody.setAttribute("fill", "none");
         snakeBody.setAttribute("stroke-linecap", "round");
         overlay.appendChild(snakeBody);
-
-        // Snake head
         const headSize = 10;
         const angle = Math.atan2(y2 - midY, x2 - midX);
         const hx = x2, hy = y2;
@@ -727,7 +775,6 @@ class GameManager {
         const hy1 = hy - headSize * Math.sin(angle - Math.PI / 6);
         const hx2 = hx - headSize * Math.cos(angle + Math.PI / 6);
         const hy2 = hy - headSize * Math.sin(angle + Math.PI / 6);
-
         const head = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
         head.setAttribute("points", `${hx},${hy} ${hx1},${hy1} ${hx2},${hy2}`);
         head.setAttribute("fill", "red");
@@ -737,40 +784,31 @@ class GameManager {
     placePowerupOnBoard(cellNum, type) {
         const cell = document.getElementById(`cell-${cellNum}`);
         if (!cell) return;
-
         const powerupEle = document.createElement("div");
         powerupEle.className = `powerup-icon ${type}`;
         powerupEle.innerText = this.powerupIcons[type];
-
         if (type === "legendary") {
             cell.classList.add("legendary-cell");
         }
-
         cell.appendChild(powerupEle);
     }
 
-    // --- Player Inventory + Powerup Logic ---
     renderPlayerInventories() {
         this.inventoryContainer.innerHTML = "";
-
         this.players.forEach(player => {
             const inventoryDiv = document.createElement("div");
             inventoryDiv.className = "player-inventory";
             inventoryDiv.id = `player-${player.color}-inventory`;
-
             const title = document.createElement("h3");
             title.innerText = `${capitalize(player.color)}'s Inventory`;
             inventoryDiv.appendChild(title);
-
             this.powerupTypes.forEach(type => {
                 const typeRow = document.createElement("div");
                 typeRow.className = "powerup-type";
-
                 const slot = document.createElement("div");
                 slot.className = `powerup-slot ${type}`;
                 slot.dataset.type = type;
                 slot.dataset.index = 1;
-
                 const powerup = player.inventory[type][0];
                 if (powerup) {
                     slot.dataset.filled = true;
@@ -779,17 +817,14 @@ class GameManager {
                     slot.dataset.filled = "";
                     slot.innerText = "";
                 }
-
                 slot.addEventListener("click", () => {
                     if (slot.dataset.filled) {
                         this.usePowerup(this.players[this.currentPlayerIdx], slot);
                     }
                 });
-
                 typeRow.appendChild(slot);
                 inventoryDiv.appendChild(typeRow);
             });
-
             this.inventoryContainer.appendChild(inventoryDiv);
         });
     }
@@ -797,7 +832,7 @@ class GameManager {
     addPowerupToPlayer(player, type, name) {
         const powerup = powerupDefinitions[type].find(p => p.name === name);
         if (powerup && !player.inventory[type].find(p => p.name === name)) {
-            player.inventory[type] = [powerup]; // Only one powerup per type
+            player.inventory[type] = [powerup];
             this.renderPlayerInventories();
             this.updateInventoryInteractivity();
         }
@@ -806,30 +841,12 @@ class GameManager {
     usePowerup(player, slot) {
         const type = slot.dataset.type;
         const name = slot.innerText;
-
-        // Find the powerup in the player's inventory
         const powerup = player.inventory[type].find(p => p.name === name);
         if (!powerup) return;
-
         const opponent = this.players.find(p => p !== player);
         powerup.effect(player, opponent, this, powerup.duration);
-
-        // Log the powerup use
-        this.logTurn({
-            player,
-            action: "usePowerup",
-            dice: null,
-            from: player.position,
-            to: player.position,
-            events: ["powerup"],
-            powerupUsed: powerup.name,
-            effectsApplied: player.effects.map(e => e.type)
-        });
-
-
         slot.innerText = "";
         slot.dataset.filled = false;
-
         const i = player.inventory[type].indexOf(powerup);
         if (i > -1) player.inventory[type].splice(i, 1);
     }
@@ -868,7 +885,6 @@ document.getElementById("show-history-btn").addEventListener("click", function (
     historyDiv.style.display = "block";
 });
 
-// Example: Give starting powerups
 gameManager.addPowerupToPlayer(gameManager.players[0], "attack", "Mark of Misfortune");
 gameManager.addPowerupToPlayer(gameManager.players[1], "attack", "Dice Curse");
-gameManager.addPowerupToPlayer(gameManager.players[1], "movement", "Broken Teleporter");
+gameManager.addPowerupToPlayer(gameManager.players[1], "movement", "Slow Crawl");
